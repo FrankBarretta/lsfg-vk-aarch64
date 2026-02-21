@@ -100,6 +100,9 @@ namespace {
             throw ls::vulkan_error(res, "vkBindImageMemory() failed");
 
         if (exportFd.has_value()) {
+            if (!vk.df().GetMemoryFdKHR)
+                throw ls::vulkan_error("vkGetMemoryFdKHR() unavailable");
+
             const VkMemoryGetFdInfoKHR fdInfo{
                 .sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR,
                 .memory = handle,

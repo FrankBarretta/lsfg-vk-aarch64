@@ -160,6 +160,8 @@ namespace {
             return VK_ERROR_INITIALIZATION_FAILED;
         }
 
+        bool graphical = false;
+
         // create device
         try {
             VkDeviceCreateInfo newInfo = *info;
@@ -170,6 +172,13 @@ namespace {
                         throw ls::vulkan_error(res, "vkCreateDevice() failed");
                 }
             );
+
+            for (uint32_t i = 0; i < newInfo.enabledExtensionCount; i++) {
+                if (std::string(newInfo.ppEnabledExtensionNames[i]) == "VK_KHR_swapchain") {
+                    graphical = true;
+                    break;
+                }
+            }
         } catch (const ls::vulkan_error& e) {
             if (e.error() == VK_ERROR_EXTENSION_NOT_PRESENT)
                 std::cerr << "lsfg-vk: required Vulkan device extensions are not present. "
@@ -184,8 +193,8 @@ namespace {
                 vk::Vulkan(
                     instance_info->handles.front(), *device, physdev,
                     instance_info->funcs, vk::initVulkanDeviceFuncs(instance_info->funcs, *device,
-                        true),
-                    true, setLoaderData
+                        graphical),
+                    graphical, setLoaderData
                 )
             );
         } catch (const std::exception& e) {
@@ -242,6 +251,9 @@ namespace {
 
     // get optional function pointer override
     PFN_vkVoidFunction getProcAddr(const std::string& name) {
+        if (!layer_info)
+            return nullptr;
+
         auto it = layer_info->map.find(name);
         if (it != layer_info->map.end())
             return it->second;
@@ -255,6 +267,8 @@ namespace {
         auto func = getProcAddr(name);
         if (func) return func;
 
+        if (!layer_info)
+            return nullptr;
         if (!layer_info->GetInstanceProcAddr) return nullptr;
         return layer_info->GetInstanceProcAddr(instance, name);
     }
@@ -266,6 +280,8 @@ namespace {
         auto func = getProcAddr(name);
         if (func) return func;
 
+        if (!instance_info)
+            return nullptr;
         if (!instance_info->funcs.GetDeviceProcAddr) return nullptr;
         return instance_info->funcs.GetDeviceProcAddr(device, name);
     }
@@ -443,6 +459,7 @@ namespace {
     }
 }
 
+extern "C" {
 /// Vulkan layer entrypoint
 __attribute__((visibility("default")))
 VkResult vkNegotiateLoaderLayerInterfaceVersion(VkNegotiateLayerInterface* pVersionStruct) {
@@ -478,11 +495,10 @@ VkResult vkNegotiateLoaderLayerInterfaceVersion(VkNegotiateLayerInterface* pVers
             .root = Root()
         };
 
-        if (!layer_info->root.active()) { // skip inactive
-            delete layer_info; // NOLINT (memory management)
-            layer_info = nullptr;
-
-            return VK_ERROR_INITIALIZATION_FAILED;
+        if (!layer_info->root.active()) {
+            layer_info->map.erase("vkCreateSwapchainKHR");
+            layer_info->map.erase("vkQueuePresentKHR");
+            layer_info->map.erase("vkDestroySwapchainKHR");
         }
     } catch (const std::exception& e) {
         std::cerr << "lsfg-vk: something went wrong during lsfg-vk layer initialization:\n";
@@ -497,4 +513,17 @@ VkResult vkNegotiateLoaderLayerInterfaceVersion(VkNegotiateLayerInterface* pVers
     pVersionStruct->pfnGetDeviceProcAddr = myvkGetDeviceProcAddr;
     pVersionStruct->pfnGetInstanceProcAddr = myvkGetInstanceProcAddr;
     return VK_SUCCESS;
+}
+
+/// Vulkan layer legacy entrypoint for instance-level proc lookup
+__attribute__((visibility("default")))
+PFN_vkVoidFunction vkGetInstanceProcAddr(VkInstance instance, const char* pName) {
+    return myvkGetInstanceProcAddr(instance, pName);
+}
+
+/// Vulkan layer legacy entrypoint for device-level proc lookup
+__attribute__((visibility("default")))
+PFN_vkVoidFunction vkGetDeviceProcAddr(VkDevice device, const char* pName) {
+    return myvkGetDeviceProcAddr(device, pName);
+}
 }

@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <vector>
 
 #include <vulkan/vulkan_core.h>
@@ -17,13 +18,19 @@ namespace {
     /// create a shader module
     ls::owned_ptr<VkShaderModule> createShaderModule(
             const vk::Vulkan& vk,
-            const uint8_t* data, size_t data_len) {
+            const std::vector<uint8_t>& code) {
         VkShaderModule handle{};
+
+        if ((code.size() % sizeof(uint32_t)) != 0)
+            throw ls::error("shader bytecode size is not a multiple of 4");
+
+        std::vector<uint32_t> words(code.size() / sizeof(uint32_t));
+        std::memcpy(words.data(), code.data(), code.size());
 
         const VkShaderModuleCreateInfo shaderModuleInfo{
             .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            .codeSize = data_len,
-            .pCode = reinterpret_cast<const uint32_t*>(data)
+            .codeSize = code.size(),
+            .pCode = words.data()
         };
         auto res = vk.df().CreateShaderModule(vk.dev(), &shaderModuleInfo, VK_NULL_HANDLE, &handle);
         if (res != VK_SUCCESS)
@@ -150,9 +157,7 @@ namespace {
 Shader::Shader(const vk::Vulkan& vk, const std::vector<uint8_t>& code,
         size_t sampledImages, size_t storageImages,
         size_t buffers, size_t samplers) :
-    shaderModule(createShaderModule(vk,
-        code.data(), code.size()
-    )),
+    shaderModule(createShaderModule(vk, code)),
     descriptorLayout(createDescriptorSetLayout(vk,
         sampledImages, storageImages,
         buffers, samplers

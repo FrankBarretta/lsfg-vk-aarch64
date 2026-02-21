@@ -14,7 +14,9 @@ target_compile_options(lsfg-vk-layer PRIVATE
     -Wno-unsafe-buffer-usage) # Array indexing
 
 set_target_properties(lsfg-vk-layer PROPERTIES
-    CXX_VISIBILITY_PRESET hidden)
+    CXX_VISIBILITY_PRESET hidden
+    VERSION 1.0.0
+    SOVERSION 1)
 
 configure_file(
     "VkLayer_LSFGVK_frame_generation.json.in"

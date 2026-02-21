@@ -158,6 +158,12 @@ namespace {
         return func;
     }
 
+    template<typename T>
+    T dpa_optional(const VulkanInstanceFuncs& funcs, VkDevice device, const char* name) {
+        return reinterpret_cast<T>(
+            funcs.GetDeviceProcAddr(device, name));
+    }
+
     /// create a logical device
     ls::owned_ptr<VkDevice> createLogicalDevice(const VulkanInstanceFuncs& fi,
             VkPhysicalDevice physdev, uint32_t cfi, bool fp16) {
@@ -177,8 +183,7 @@ namespace {
         };
         const std::vector<const char*> requestedExtensions{
             VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
-            VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME,
-            VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME
+            VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME
         };
         const VkDeviceCreateInfo deviceInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -314,7 +319,7 @@ VulkanInstanceFuncs vk::initVulkanInstanceFuncs(VkInstance i, PFN_vkGetInstanceP
 /// initialize vulkan device function pointers
 VulkanDeviceFuncs vk::initVulkanDeviceFuncs(const VulkanInstanceFuncs& f, VkDevice d,
         bool graphical) {
-    return {
+    auto funcs = VulkanDeviceFuncs{
         .GetDeviceQueue = dpa<PFN_vkGetDeviceQueue>(f, d, "vkGetDeviceQueue"),
         .DeviceWaitIdle = dpa<PFN_vkDeviceWaitIdle>(f, d, "vkDeviceWaitIdle"),
         .CreateCommandPool = dpa<PFN_vkCreateCommandPool>(f, d, "vkCreateCommandPool"),
@@ -376,11 +381,13 @@ VulkanDeviceFuncs vk::initVulkanDeviceFuncs(const VulkanInstanceFuncs& f, VkDevi
         .CreateComputePipelines = dpa<PFN_vkCreateComputePipelines>(f, d, "vkCreateComputePipelines"),
         .DestroyPipeline = dpa<PFN_vkDestroyPipeline>(f, d, "vkDestroyPipeline"),
 
-        .SignalSemaphoreKHR = dpa<PFN_vkSignalSemaphoreKHR>(f, d, "vkSignalSemaphoreKHR"),
-        .WaitSemaphoresKHR = dpa<PFN_vkWaitSemaphoresKHR>(f, d, "vkWaitSemaphoresKHR"),
-        .GetMemoryFdKHR = dpa<PFN_vkGetMemoryFdKHR>(f, d, "vkGetMemoryFdKHR"),
-        .ImportSemaphoreFdKHR = dpa<PFN_vkImportSemaphoreFdKHR>(f, d, "vkImportSemaphoreFdKHR"),
-        .GetSemaphoreFdKHR = dpa<PFN_vkGetSemaphoreFdKHR>(f, d, "vkGetSemaphoreFdKHR"),
+        .SignalSemaphore = dpa_optional<PFN_vkSignalSemaphore>(f, d, "vkSignalSemaphore"),
+        .WaitSemaphores = dpa_optional<PFN_vkWaitSemaphores>(f, d, "vkWaitSemaphores"),
+        .SignalSemaphoreKHR = dpa_optional<PFN_vkSignalSemaphoreKHR>(f, d, "vkSignalSemaphoreKHR"),
+        .WaitSemaphoresKHR = dpa_optional<PFN_vkWaitSemaphoresKHR>(f, d, "vkWaitSemaphoresKHR"),
+        .GetMemoryFdKHR = dpa_optional<PFN_vkGetMemoryFdKHR>(f, d, "vkGetMemoryFdKHR"),
+        .ImportSemaphoreFdKHR = dpa_optional<PFN_vkImportSemaphoreFdKHR>(f, d, "vkImportSemaphoreFdKHR"),
+        .GetSemaphoreFdKHR = dpa_optional<PFN_vkGetSemaphoreFdKHR>(f, d, "vkGetSemaphoreFdKHR"),
 
         .CreateSwapchainKHR = graphical ?
             dpa<PFN_vkCreateSwapchainKHR>(f, d, "vkCreateSwapchainKHR") : nullptr,
@@ -393,6 +400,13 @@ VulkanDeviceFuncs vk::initVulkanDeviceFuncs(const VulkanInstanceFuncs& f, VkDevi
         .DestroySwapchainKHR = graphical ?
             dpa<PFN_vkDestroySwapchainKHR>(f, d, "vkDestroySwapchainKHR") : nullptr
     };
+
+    if (!funcs.SignalSemaphore && !funcs.SignalSemaphoreKHR)
+        throw ls::vulkan_error("failed to get timeline semaphore signal function");
+    if (!funcs.WaitSemaphores && !funcs.WaitSemaphoresKHR)
+        throw ls::vulkan_error("failed to get timeline semaphore wait function");
+
+    return funcs;
 }
 
 Vulkan::Vulkan(const std::string& appName, version appVersion,

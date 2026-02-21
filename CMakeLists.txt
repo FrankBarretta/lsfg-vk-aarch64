@@ -8,9 +8,20 @@ option(LSFGVK_BUILD_UI           "Build the user interface"         OFF)
 option(LSFGVK_BUILD_CLI          "Build the command line interface"  ON)
 option(LSFGVK_INSTALL_DEVELOP    "Install development libraries and headers"      OFF)
 option(LSFGVK_INSTALL_XDG_FILES  "Install the application icon and desktop files" OFF)
-set(LSFGVK_LAYER_LIBRARY_PATH liblsfg-vk-layer.so CACHE STRING "Change where Vulkan searches for the layer library")
+set(_LSFGVK_DEFAULT_LAYER_LIBRARY_PATH
+    "${CMAKE_INSTALL_FULL_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}lsfg-vk-layer${CMAKE_SHARED_LIBRARY_SUFFIX}")
+set(LSFGVK_LAYER_LIBRARY_PATH "${_LSFGVK_DEFAULT_LAYER_LIBRARY_PATH}" CACHE STRING "Change where Vulkan searches for the layer library")
 option(LSFGVK_TESTING_RENDERDOC  "Enable RenderDoc integration for testing purposes" OFF)
 # === READ HERE FOR BUILD OPTIONS ===
+
+if(CMAKE_SIZEOF_VOID_P LESS 8)
+    message(FATAL_ERROR "lsfg-vk supports only 64-bit targets")
+endif()
+
+string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" LSFGVK_SYSTEM_PROCESSOR)
+if(LSFGVK_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    message(STATUS "Building lsfg-vk for AArch64")
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

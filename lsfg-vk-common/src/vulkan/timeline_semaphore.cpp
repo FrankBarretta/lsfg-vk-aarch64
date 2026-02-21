@@ -37,6 +37,9 @@ namespace {
             throw ls::vulkan_error(res, "vkCreateSemaphore() failed");
 
         if (importFd.has_value()) {
+            if (!vk.df().ImportSemaphoreFdKHR)
+                throw ls::vulkan_error("vkImportSemaphoreFdKHR() unavailable");
+
             // import semaphore from fd
             const VkImportSemaphoreFdInfoKHR importInfo{
                 .sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR,
@@ -50,6 +53,9 @@ namespace {
         }
 
         if (exportFd.has_value()) {
+            if (!vk.df().GetSemaphoreFdKHR)
+                throw ls::vulkan_error("vkGetSemaphoreFdKHR() unavailable");
+
             // export semaphore to fd
             const VkSemaphoreGetFdInfoKHR getFdInfo{
                 .sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR,
@@ -83,7 +89,8 @@ void TimelineSemaphore::signal(const vk::Vulkan& vk, uint64_t value) const {
         .semaphore = *this->semaphore,
         .value = value
     };
-    auto res = vk.df().SignalSemaphoreKHR(vk.dev(), &signalInfo);
+    auto signal = vk.df().SignalSemaphore ? vk.df().SignalSemaphore : vk.df().SignalSemaphoreKHR;
+    auto res = signal(vk.dev(), &signalInfo);
     if (res != VK_SUCCESS)
         throw ls::vulkan_error(res, "vkSignalSemaphore() failed");
 }
@@ -95,7 +102,8 @@ bool TimelineSemaphore::wait(const vk::Vulkan& vk, uint64_t value, uint64_t time
         .pSemaphores = &*this->semaphore,
         .pValues = &value
     };
-    auto res = vk.df().WaitSemaphoresKHR(vk.dev(), &waitInfo, timeout);
+    auto wait = vk.df().WaitSemaphores ? vk.df().WaitSemaphores : vk.df().WaitSemaphoresKHR;
+    auto res = wait(vk.dev(), &waitInfo, timeout);
     if (res != VK_SUCCESS && res != VK_TIMEOUT)
         throw ls::vulkan_error(res, "vkWaitSemaphores() failed");
 

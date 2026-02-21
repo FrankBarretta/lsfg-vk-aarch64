@@ -7,7 +7,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <span>
+#include <cstring>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -33,15 +33,11 @@ namespace {
     }
     /// patch the generate shader
     void patchGenerateShader(std::vector<uint8_t>& data, bool hdr) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunknown-warning-option"
-#pragma clang diagnostic ignored "-Wunsafe-buffer-usage-in-container"
-        auto* _ptr = data.data();
-        const std::span<uint32_t> words(
-            reinterpret_cast<uint32_t*>(_ptr),
-            data.size() / sizeof(uint32_t)
-        );
-#pragma clang diagnostic pop
+        if ((data.size() % sizeof(uint32_t)) != 0)
+            throw ls::error("invalid shader bytecode length");
+
+        std::vector<uint32_t> words(data.size() / sizeof(uint32_t));
+        std::memcpy(words.data(), data.data(), data.size());
 
         const uint16_t SpvOpCapability = 17;
         const uint16_t SpvOpTypeImage = 25;
@@ -71,6 +67,8 @@ namespace {
 
             i += wc ? wc : 1;
         }
+
+        std::memcpy(data.data(), words.data(), data.size());
     }
 }
 

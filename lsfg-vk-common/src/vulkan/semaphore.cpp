@@ -29,6 +29,9 @@ namespace {
             throw ls::vulkan_error(res, "vkCreateSemaphore() failed");
 
         if (fd.has_value()) {
+            if (!vk.df().ImportSemaphoreFdKHR)
+                throw ls::vulkan_error("vkImportSemaphoreFdKHR() unavailable");
+
             // import semaphore from fd
             const VkImportSemaphoreFdInfoKHR importInfo{
                 .sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR,

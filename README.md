@@ -12,10 +12,12 @@
 > Please keep in mind that it is not officially supported and support questions should be directed to the plugin's repository & discord.
 
 1. Before proceeding, please make sure you have [Lossless Scaling](https://store.steampowered.com/app/993090/Lossless_Scaling/) downloaded on Steam.
-2. Head to the [GitHub Releases](https://github.com/PancakeTAS/lsfg-vk/releases) and download the file named "lsfg-vk-2.0.0-x86_64.tar.xz".
+2. Head to the [GitHub Releases](https://github.com/PancakeTAS/lsfg-vk/releases) and download the archive for your architecture:
+  - `lsfg-vk-2.0.0-linux-x86_64.tar.xz`
+  - `lsfg-vk-2.0.0-linux-aarch64.tar.xz`
 3. Open a terminal in the folder where you downloaded the file and run the following:
 ```bash
-tar -xvf lsfg-vk-2.0.0-linux.tar.xz -C ~/.local
+tar -xvf lsfg-vk-2.0.0-linux-<arch>.tar.xz -C ~/.local
 ```
 This will extract lsfg-vk to `~/.local`. Please **keep track of the files that were extracted**, in case you want to uninstall lsfg-vk later.
 
@@ -52,6 +54,47 @@ The default configuration is located in `~/.config/lsfg-vk/conf.toml`. It will b
 You can validate the configuration using `lsfg-vk-cli`:
 ```bash
 ~/.local/bin/lsfg-vk-cli validate
+```
+
+
+Comandi Utili: 
+
+```bash
+cd ~/lsfg-vk-aarch64
+
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLSFGVK_BUILD_UI=OFF -DLSFGVK_BUILD_CLI=ON
+
+cmake --build build -j$(nproc)
+sudo cmake --install build
+sudo ldconfig
+```
+
+```bash
+sudo -u francesco env DISPLAY=:0 XAUTHORITY=/home/francesco/.Xauthority xrandr --query
+sudo -u francesco env DISPLAY=:0 XAUTHORITY=/home/francesco/.Xauthority xrandr --output HDMI-1 --mode 1920x1080 --rate 120
+```
+
+VIDEO: 
+```bash
+sudo nice -n -20 sudo -u francesco env DISPLAY=:0 XAUTHORITY=/home/francesco/.Xauthority \
+XDG_RUNTIME_DIR=/run/user/$(id -u francesco) \
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/panfrost_icd.json \
+VK_LOADER_LAYERS_DISABLE=~implicit~ VK_INSTANCE_LAYERS=VK_LAYER_LSFGVK_frame_generation \
+LSFGVK_ENV=1 LSFGVK_DLL_PATH=/home/francesco/Lossless.dll LSFGVK_MULTIPLIER=4 \
+LSFGVK_PERFORMANCE_MODE=1 LSFGVK_FLOW_SCALE=0.80 \
+mpv --no-config --vo=gpu-next --gpu-api=vulkan --gpu-context=x11vk --audio=no \
+--cache=no --demuxer-readahead-secs=0 --video-sync=desync --framedrop=vo \
+--profile=low-latency --fullscreen --untimed \
+--demuxer-max-bytes=1MiB --demuxer-max-back-bytes=1MiB \
+--vd-lavc-threads=1 --vd-lavc-skiploopfilter=all \
+--demuxer=lavf --demuxer-lavf-format=video4linux2 \
+--demuxer-lavf-o=input_format=nv12,video_size=1920x1080,framerate=30,fflags=nobuffer+fastseek,flags=low_delay,probesize=32,analyzeduration=0,avioflags=direct,buffersize=1024 \
+/dev/video5
+```
+
+AUDIO: 
+```bash
+arecord -D plughw:CARD=2,DEV=0 -f S16_LE -c2 -r48000 | aplay -D default -f S16_LE -c2 -r48000
 ```
 
 ### Benchmarking Mode

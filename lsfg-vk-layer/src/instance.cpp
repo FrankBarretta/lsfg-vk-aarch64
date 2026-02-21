@@ -84,8 +84,10 @@ bool Root::update() {
 
 void Root::modifyInstanceCreateInfo(VkInstanceCreateInfo& createInfo,
         const std::function<void(void)>& finish) const {
-    if (!this->active_profile.has_value())
+    if (!this->active_profile.has_value()) {
+        finish();
         return;
+    }
 
     auto extensions = add_extensions(
         createInfo.ppEnabledExtensionNames,
@@ -104,8 +106,10 @@ void Root::modifyInstanceCreateInfo(VkInstanceCreateInfo& createInfo,
 
 void Root::modifyDeviceCreateInfo(VkDeviceCreateInfo& createInfo,
         const std::function<void(void)>& finish) const {
-    if (!this->active_profile.has_value())
+    if (!this->active_profile.has_value()) {
+        finish();
         return;
+    }
 
     auto extensions = add_extensions(
         createInfo.ppEnabledExtensionNames,
@@ -150,8 +154,10 @@ void Root::modifyDeviceCreateInfo(VkDeviceCreateInfo& createInfo,
 
 void Root::modifySwapchainCreateInfo(const vk::Vulkan& vk, VkSwapchainCreateInfoKHR& createInfo,
         const std::function<void(void)>& finish) const {
-    if (!this->active_profile.has_value())
+    if (!this->active_profile.has_value()) {
+        finish();
         return;
+    }
 
     VkSurfaceCapabilitiesKHR caps{};
     auto res = vk.fi().GetPhysicalDeviceSurfaceCapabilitiesKHR(

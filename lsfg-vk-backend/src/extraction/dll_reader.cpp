@@ -11,11 +11,12 @@
 #include <optional>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <utility>
 #include <vector>
 #include <array>
-#include <span>
+#include <type_traits>
 
 using namespace lsfgvk;
 using namespace lsfgvk::backend;
@@ -41,7 +42,8 @@ struct PEHeader {
 struct PEOptionalHeader {
     uint16_t magic; // 0x20B
     std::array<uint16_t, 63> pad4;
-    std::pair<uint32_t, uint32_t> resource_table; // file offset/size
+    uint32_t resource_table_rva;
+    uint32_t resource_table_size;
 };
 
 /// Section header
@@ -78,22 +80,32 @@ struct ResourceDataEntry {
 #pragma clang diagnostic ignored "-Wunknown-warning-option"
 #pragma clang diagnostic ignored "-Wunsafe-buffer-usage-in-container"
 namespace {
-    /// Safely cast a vector to a pointer of type T
+    /// Safely read an object of type T from a byte vector
     template<typename T>
-    const T* safe_cast(const std::vector<uint8_t>& data, size_t offset) {
+    T read_object(const std::vector<uint8_t>& data, size_t offset) {
+        static_assert(std::is_trivially_copyable_v<T>);
+
         const size_t end = offset + sizeof(T);
         if (end > data.size() || end < offset)
-            throw ls::error("buffer overflow/underflow during safe cast");
-        return reinterpret_cast<const T*>(&data.at(offset));
+            throw ls::error("buffer overflow/underflow during object read");
+
+        T value{};
+        std::memcpy(&value, &data.at(offset), sizeof(T));
+        return value;
     }
 
-    /// Safely cast a vector to a span of T
+    /// Safely read a list of objects of type T from a byte vector
     template<typename T>
-    std::span<const T> span_cast(const std::vector<uint8_t>& data, size_t offset, size_t count) {
+    std::vector<T> read_array(const std::vector<uint8_t>& data, size_t offset, size_t count) {
+        static_assert(std::is_trivially_copyable_v<T>);
+
         const size_t end = offset + (count * sizeof(T));
         if (end > data.size() || end < offset)
-            throw ls::error("buffer overflow/underflow during safe cast");
-        return std::span<const T>(reinterpret_cast<const T*>(&data.at(offset)), count);
+            throw ls::error("buffer overflow/underflow during array read");
+
+        std::vector<T> values(count);
+        std::memcpy(values.data(), &data.at(offset), count * sizeof(T));
+        return values;
     }
 }
 #pragma clang diagnostic pop
@@ -113,27 +125,28 @@ std::unordered_map<uint32_t, std::vector<uint8_t>> backend::extractResourcesFrom
 
     // parse dos header
     size_t fileOffset = 0;
-    const auto* dosHdr = safe_cast<const DOSHeader>(data, 0);
-    if (dosHdr->magic != 0x5A4D)
+    const auto dosHdr = read_object<DOSHeader>(data, 0);
+    if (dosHdr.magic != 0x5A4D)
         throw ls::error("dos header magic number is incorrect");
 
     // parse pe header
-    fileOffset += static_cast<size_t>(dosHdr->pe_offset);
-    const auto* peHdr = safe_cast<const PEHeader>(data, fileOffset);
-    if (peHdr->signature != 0x00004550)
+    fileOffset += static_cast<size_t>(dosHdr.pe_offset);
+    const auto peHdr = read_object<PEHeader>(data, fileOffset);
+    if (peHdr.signature != 0x00004550)
         throw ls::error("pe header signature is incorrect");
 
     // parse optional pe header
     fileOffset += sizeof(PEHeader);
-    const auto* peOptHdr = safe_cast<const PEOptionalHeader>(data, fileOffset);
-    if (peOptHdr->magic != 0x20B)
+    const auto peOptHdr = read_object<PEOptionalHeader>(data, fileOffset);
+    if (peOptHdr.magic != 0x20B)
         throw ls::error("pe format is not PE32+");
-    const auto& [rsrc_rva, rsrc_size] = peOptHdr->resource_table;
+    const uint32_t rsrc_rva = peOptHdr.resource_table_rva;
+    const uint32_t rsrc_size = peOptHdr.resource_table_size;
 
     // locate section containing resources
     std::optional<size_t> rsrc_offset;
-    fileOffset += peHdr->opt_hdr_size;
-    const auto sectHdrs = span_cast<const SectionHeader>(data, fileOffset, peHdr->sect_count);
+    fileOffset += peHdr.opt_hdr_size;
+    const auto sectHdrs = read_array<SectionHeader>(data, fileOffset, peHdr.sect_count);
     for (const auto& sectHdr : sectHdrs) {
         if (rsrc_rva < sectHdr.vaddress || rsrc_rva > (sectHdr.vaddress + sectHdr.vsize))
             continue;
@@ -146,15 +159,15 @@ std::unordered_map<uint32_t, std::vector<uint8_t>> backend::extractResourcesFrom
 
     // parse resource directory
     fileOffset = rsrc_offset.value();
-    const auto* rsrcDir = safe_cast<const ResourceDirectory>(data, fileOffset);
-    if (rsrcDir->id_count < 3)
+    const auto rsrcDir = read_object<ResourceDirectory>(data, fileOffset);
+    if (rsrcDir.id_count < 3)
         throw ls::error("resource directory does not have enough entries");
 
     // find resource table with data type
     std::optional<size_t> rsrc_tbl_offset;
     fileOffset = rsrc_offset.value() + sizeof(ResourceDirectory);
-    const auto rsrcDirEntries = span_cast<const ResourceDirectoryEntry>(
-        data, fileOffset, rsrcDir->name_count + rsrcDir->id_count);
+    const auto rsrcDirEntries = read_array<ResourceDirectoryEntry>(
+        data, fileOffset, rsrcDir.name_count + rsrcDir.id_count);
     for (const auto& rsrcDirEntry : rsrcDirEntries) {
         if (rsrcDirEntry.id != 10) // RT_RCDATA
             continue;
@@ -168,14 +181,14 @@ std::unordered_map<uint32_t, std::vector<uint8_t>> backend::extractResourcesFrom
 
     // parse data type resource directory
     fileOffset = rsrc_offset.value() + rsrc_tbl_offset.value();
-    const auto* rsrcTbl = safe_cast<const ResourceDirectory>(data, fileOffset);
-    if (rsrcTbl->id_count < 1)
+    const auto rsrcTbl = read_object<ResourceDirectory>(data, fileOffset);
+    if (rsrcTbl.id_count < 1)
         throw ls::error("RT_RCDATA directory does not have enough entries");
 
     // collect all resources
     fileOffset += sizeof(ResourceDirectory);
-    const auto rsrcTblEntries = span_cast<const ResourceDirectoryEntry>(
-        data, fileOffset, rsrcTbl->name_count + rsrcTbl->id_count);
+    const auto rsrcTblEntries = read_array<ResourceDirectoryEntry>(
+        data, fileOffset, rsrcTbl.name_count + rsrcTbl.id_count);
     std::unordered_map<uint32_t, std::vector<uint8_t>> resources;
     for (const auto& rsrcTblEntry : rsrcTblEntries) {
         if ((rsrcTblEntry.offset & 0x80000000) == 0)
@@ -183,27 +196,27 @@ std::unordered_map<uint32_t, std::vector<uint8_t>> backend::extractResourcesFrom
 
         // skip over language directory
         fileOffset = rsrc_offset.value() + (rsrcTblEntry.offset & 0x7FFFFFFF);
-        const auto* langDir = safe_cast<const ResourceDirectory>(data, fileOffset);
-        if (langDir->id_count < 1)
+        const auto langDir = read_object<ResourceDirectory>(data, fileOffset);
+        if (langDir.id_count < 1)
             throw ls::error("Incorrect language directory");
 
         fileOffset += sizeof(ResourceDirectory);
-        const auto* langDirEntry = safe_cast<const ResourceDirectoryEntry>(data, fileOffset);
-        if ((langDirEntry->offset & 0x80000000) != 0)
+        const auto langDirEntry = read_object<ResourceDirectoryEntry>(data, fileOffset);
+        if ((langDirEntry.offset & 0x80000000) != 0)
             throw ls::error("expected resource data entry, but found directory");
 
         // parse resource data entry
-        fileOffset = rsrc_offset.value() + (langDirEntry->offset & 0x7FFFFFFF);
-        const auto* entry = safe_cast<const ResourceDataEntry>(data, fileOffset);
-        if (entry->offset < rsrc_rva || entry->offset > (rsrc_rva + rsrc_size))
+        fileOffset = rsrc_offset.value() + (langDirEntry.offset & 0x7FFFFFFF);
+        const auto entry = read_object<ResourceDataEntry>(data, fileOffset);
+        if (entry.offset < rsrc_rva || entry.offset > (rsrc_rva + rsrc_size))
             throw ls::error("resource data entry points outside resource section");
 
         // extract resource
-        std::vector<uint8_t> resource(entry->size);
-        fileOffset = (entry->offset - rsrc_rva) + rsrc_offset.value();
-        if (fileOffset + entry->size > data.size())
+        std::vector<uint8_t> resource(entry.size);
+        fileOffset = (entry.offset - rsrc_rva) + rsrc_offset.value();
+        if (fileOffset + entry.size > data.size())
             throw ls::error("resource data entry points outside file");
-        std::copy_n(&data.at(fileOffset), entry->size, resource.data());
+        std::copy_n(&data.at(fileOffset), entry.size, resource.data());
         resources.emplace(rsrcTblEntry.id, std::move(resource));
     }
 

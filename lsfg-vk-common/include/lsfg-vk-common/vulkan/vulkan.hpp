@@ -105,9 +105,13 @@ namespace vk {
         PFN_vkCreateComputePipelines CreateComputePipelines;
         PFN_vkDestroyPipeline DestroyPipeline;
 
-        // extension functions
+        // timeline semaphore functions (core in Vulkan 1.2, extension fallback)
+        PFN_vkSignalSemaphore SignalSemaphore;
+        PFN_vkWaitSemaphores WaitSemaphores;
         PFN_vkSignalSemaphoreKHR SignalSemaphoreKHR;
         PFN_vkWaitSemaphoresKHR WaitSemaphoresKHR;
+
+        // extension functions
         PFN_vkGetMemoryFdKHR GetMemoryFdKHR;
         PFN_vkImportSemaphoreFdKHR ImportSemaphoreFdKHR;
         PFN_vkGetSemaphoreFdKHR GetSemaphoreFdKHR;
