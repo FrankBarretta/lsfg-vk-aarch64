@@ -69,34 +69,6 @@ sudo cmake --install build
 sudo ldconfig
 ```
 
-```bash
-sudo -u francesco env DISPLAY=:0 XAUTHORITY=/home/francesco/.Xauthority xrandr --query
-sudo -u francesco env DISPLAY=:0 XAUTHORITY=/home/francesco/.Xauthority xrandr --output HDMI-1 --mode 1920x1080 --rate 120
-```
-
-VIDEO: 
-```bash
-sudo nice -n -20 sudo -u francesco env DISPLAY=:0 XAUTHORITY=/home/francesco/.Xauthority \
-XDG_RUNTIME_DIR=/run/user/$(id -u francesco) \
-VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/panfrost_icd.json \
-VK_LOADER_LAYERS_DISABLE=~implicit~ VK_INSTANCE_LAYERS=VK_LAYER_LSFGVK_frame_generation \
-LSFGVK_ENV=1 LSFGVK_DLL_PATH=/home/francesco/Lossless.dll LSFGVK_MULTIPLIER=4 \
-LSFGVK_PERFORMANCE_MODE=1 LSFGVK_FLOW_SCALE=0.80 \
-mpv --no-config --vo=gpu-next --gpu-api=vulkan --gpu-context=x11vk --audio=no \
---cache=no --demuxer-readahead-secs=0 --video-sync=desync --framedrop=vo \
---profile=low-latency --fullscreen --untimed \
---demuxer-max-bytes=1MiB --demuxer-max-back-bytes=1MiB \
---vd-lavc-threads=1 --vd-lavc-skiploopfilter=all \
---demuxer=lavf --demuxer-lavf-format=video4linux2 \
---demuxer-lavf-o=input_format=nv12,video_size=1920x1080,framerate=30,fflags=nobuffer+fastseek,flags=low_delay,probesize=32,analyzeduration=0,avioflags=direct,buffersize=1024 \
-/dev/video5
-```
-
-AUDIO: 
-```bash
-arecord -D plughw:CARD=2,DEV=0 -f S16_LE -c2 -r48000 | aplay -D default -f S16_LE -c2 -r48000
-```
-
 ### Benchmarking Mode
 You can run a frame generation benchmark using `lsfg-vk-cli`:
 ```bash
