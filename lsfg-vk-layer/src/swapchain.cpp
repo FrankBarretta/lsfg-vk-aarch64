@@ -144,6 +144,7 @@ VkResult Swapchain::present(const vk::Vulkan& vk,
 
     // update present mode when not using pacing
     if (this->profile.pacing == ls::Pacing::None) {
+#if defined(VK_STRUCTURE_TYPE_SWAPCHAIN_PRESENT_MODE_INFO_EXT) && defined(VkSwapchainPresentModeInfoEXT)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunknown-warning-option"
 #pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
@@ -158,6 +159,7 @@ VkResult Swapchain::present(const vk::Vulkan& vk,
             info = reinterpret_cast<VkSwapchainPresentModeInfoEXT*>(const_cast<void*>(info->pNext));
         }
 #pragma clang diagnostic pop
+#endif
     }
 
     // wait for completion of previous frame

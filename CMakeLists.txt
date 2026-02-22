@@ -12,6 +12,8 @@ set(_LSFGVK_DEFAULT_LAYER_LIBRARY_PATH
     "${CMAKE_INSTALL_FULL_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}lsfg-vk-layer${CMAKE_SHARED_LIBRARY_SUFFIX}")
 set(LSFGVK_LAYER_LIBRARY_PATH "${_LSFGVK_DEFAULT_LAYER_LIBRARY_PATH}" CACHE STRING "Change where Vulkan searches for the layer library")
 option(LSFGVK_TESTING_RENDERDOC  "Enable RenderDoc integration for testing purposes" OFF)
+option(LSFGVK_PORTABLE_ABI "Build with ABI portability flags for older runtime glibc/libstdc++" ON)
+option(LSFGVK_STATIC_LIBSTDCXX "Statically link libstdc++ and libgcc for better portability" ON)
 # === READ HERE FOR BUILD OPTIONS ===
 
 if(CMAKE_SIZEOF_VOID_P LESS 8)
@@ -28,6 +30,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_SKIP_RPATH ON)
+
+if(LSFGVK_PORTABLE_ABI)
+    message(STATUS "LSFGVK_PORTABLE_ABI enabled: forcing older-compatible libc symbol usage where possible")
+    add_compile_definitions(__GLIBC_USE_C2X_STRTOL=0)
+endif()
+
+if(LSFGVK_STATIC_LIBSTDCXX)
+    message(STATUS "LSFGVK_STATIC_LIBSTDCXX enabled: linking libstdc++/libgcc statically")
+    add_link_options(-static-libstdc++ -static-libgcc)
+endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

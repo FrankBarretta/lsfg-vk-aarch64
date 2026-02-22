@@ -23,6 +23,11 @@ target_include_directories(lsfg-vk-common
 target_include_directories(lsfg-vk-common SYSTEM
     PRIVATE thirdparty/include)
 
+if(DEFINED LSFGVK_VULKAN_INCLUDE_DIR AND NOT "${LSFGVK_VULKAN_INCLUDE_DIR}" STREQUAL "")
+    target_include_directories(lsfg-vk-common SYSTEM
+    PUBLIC "${LSFGVK_VULKAN_INCLUDE_DIR}")
+endif()
+
 if(LSFGVK_INSTALL_DEVELOP)
     install(TARGETS lsfg-vk-common
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")

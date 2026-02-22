@@ -1,5 +1,9 @@
 # cmake files
 /build
+/build-bionic
+/build-bionic-win
+/build-docker-portable
+/build-wsl
 
 # ide
 /.zed

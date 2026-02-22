@@ -66,6 +66,8 @@ cmake -B build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/usr/local \
     -DCMAKE_CXX_COMPILER=clang++ \
+    -DLSFGVK_PORTABLE_ABI=ON \
+    -DLSFGVK_STATIC_LIBSTDCXX=ON \
     -DLSFGVK_BUILD_UI=On \
     -DLSFGVK_INSTALL_XDG_FILES=On
 ```
@@ -79,6 +81,8 @@ However, lsfg-vk provides several CMake options to customize the build process:
 - `LSFGVK_INSTALL_DEVELOP`: Set to `On` to install development files like headers and libraries (default is `Off`).
 - `LSFGVK_INSTALL_XDG_FILES`: Set to `On` to install XDG desktop files and icons (default is `Off`).
 - `LSFGVK_LAYER_LIBRARY_PATH`: Override the path to the Vulkan layer library (by default, Vulkan will search the systems library path).
+- `LSFGVK_PORTABLE_ABI`: Enables portability flags to reduce dependency on newer glibc symbols (recommended when deploying to custom runtimes like Android/Winlator rootfs).
+- `LSFGVK_STATIC_LIBSTDCXX`: Statically links `libstdc++` and `libgcc` to reduce runtime C++ ABI issues.
 
 Please keep in mind that installing to non-system paths will require `LSFGVK_LAYER_LIBRARY_PATH` to be set accordingly (e.g. `../../../lib/liblsfg-vk-layer.so`).
 
@@ -97,3 +101,58 @@ sudo cmake --install build
 ```
 
 Keep track of the installed files, in order to uninstall them later if needed.
+
+### Reproducible portable package (Docker, Ubuntu 22.04)
+
+For custom runtimes (GameNative/Winlator) you can generate runtime-specific packages:
+
+```bash
+./tools/build-glibc.sh
+./tools/build-bionic.sh
+```
+
+Or build both in one shot:
+
+```bash
+./tools/build-all-runtime-variants.sh
+```
+
+On Windows (PowerShell):
+
+```powershell
+./tools/build-portable-docker.ps1 -PackageName lsfg-vk-2.0.0-dev24-linux-aarch64-glibc
+```
+
+`build-glibc.sh` uses the Docker portable pipeline (Ubuntu 22.04 baseline) and outputs:
+- `dist/lsfg-vk-2.0.0-dev24-linux-aarch64-glibc/`
+- `dist/lsfg-vk-2.0.0-dev24-linux-aarch64-glibc.tar.xz`
+- `dist/abi-check-lsfg-vk-2.0.0-dev24-linux-aarch64-glibc.txt`
+
+`build-bionic.sh` uses Android NDK toolchain and outputs:
+- `dist/lsfg-vk-2.0.0-dev24-linux-aarch64-bionic/`
+- `dist/lsfg-vk-2.0.0-dev24-linux-aarch64-bionic.tar.xz`
+- `dist/abi-check-lsfg-vk-2.0.0-dev24-linux-aarch64-bionic.txt`
+
+The glibc build fails automatically if the produced layer still depends on symbols too new for target runtimes
+(for example `GLIBC_2.35+`, `GLIBCXX_3.4.31+`, `__isoc23_strtoul`).
+
+The bionic build fails automatically if glibc/libstdc++ symbol versions are detected.
+
+For bionic builds, set Android NDK path first:
+
+```bash
+export ANDROID_NDK_HOME=/path/to/android-ndk
+```
+
+To override package names:
+
+```bash
+LSFGVK_PACKAGE_NAME=lsfg-vk-2.0.0-dev25-linux-aarch64-glibc ./tools/build-glibc.sh
+LSFGVK_PACKAGE_NAME=lsfg-vk-2.0.0-dev25-linux-aarch64-bionic ./tools/build-bionic.sh
+```
+
+PowerShell equivalent:
+
+```powershell
+./tools/build-portable-docker.ps1 -PackageName lsfg-vk-2.0.0-dev25-linux-aarch64-glibc
+```

@@ -62,11 +62,61 @@ Comandi Utili:
 ```bash
 cd ~/lsfg-vk-aarch64
 
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLSFGVK_BUILD_UI=OFF -DLSFGVK_BUILD_CLI=ON
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLSFGVK_BUILD_UI=OFF -DLSFGVK_BUILD_CLI=ON -DLSFGVK_PORTABLE_ABI=ON -DLSFGVK_STATIC_LIBSTDCXX=ON
 
 cmake --build build -j$(nproc)
 sudo cmake --install build
 sudo ldconfig
+
+# Portable build helper (for custom runtimes like GameNative/Winlator)
+./tools/build-portable.sh
+
+# Docker portable pipeline (recommended for reproducible ABI baseline)
+./tools/build-portable-docker.sh
+
+# Windows PowerShell wrapper
+./tools/build-portable-docker.ps1
+
+# Runtime-specific release packages (recommended)
+./tools/build-glibc.sh
+./tools/build-bionic.sh
+
+# Build both variants in sequence
+./tools/build-all-runtime-variants.sh
+```
+
+### Runtime compatibility (glibc vs bionic)
+
+`lsfg-vk-layer` is a native Linux shared library. In practice, glibc and bionic require separate builds.
+
+- Use `build-glibc.sh` for GLIBC containers/runtimes.
+- Use `build-bionic.sh` for Bionic (Android libc) containers/runtimes.
+- Publish both release assets and select by runtime variant at deployment time.
+
+Suggested asset names:
+- `lsfg-vk-2.0.0-dev24-linux-aarch64-glibc.tar.xz`
+- `lsfg-vk-2.0.0-dev24-linux-aarch64-bionic.tar.xz`
+
+If the ABI check prints symbols such as `GLIBC_2.38`, `__isoc23_strtoul` or very new `GLIBCXX_3.4.xx`,
+you need to build in an older toolchain/runtime baseline (for example Ubuntu 22.04) to maximize compatibility.
+
+The runtime-variant pipelines write outputs to `dist/`:
+- `dist/lsfg-vk-2.0.0-dev24-linux-aarch64-glibc/`
+- `dist/lsfg-vk-2.0.0-dev24-linux-aarch64-glibc.tar.xz`
+- `dist/abi-check-lsfg-vk-2.0.0-dev24-linux-aarch64-glibc.txt`
+- `dist/lsfg-vk-2.0.0-dev24-linux-aarch64-bionic/`
+- `dist/lsfg-vk-2.0.0-dev24-linux-aarch64-bionic.tar.xz`
+- `dist/abi-check-lsfg-vk-2.0.0-dev24-linux-aarch64-bionic.txt`
+
+If needed, change package names via:
+```bash
+LSFGVK_PACKAGE_NAME=lsfg-vk-2.0.0-dev25-linux-aarch64-glibc ./tools/build-glibc.sh
+LSFGVK_PACKAGE_NAME=lsfg-vk-2.0.0-dev25-linux-aarch64-bionic ./tools/build-bionic.sh
+```
+
+PowerShell equivalent (glibc pipeline):
+```powershell
+./tools/build-portable-docker.ps1 -PackageName lsfg-vk-2.0.0-dev25-linux-aarch64-glibc
 ```
 
 ### Benchmarking Mode
