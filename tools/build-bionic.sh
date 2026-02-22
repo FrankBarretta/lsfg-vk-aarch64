@@ -61,7 +61,7 @@ cmake_args=(
   -DANDROID_STL=c++_static
   -DCMAKE_INSTALL_PREFIX=/usr/local
   -DLSFGVK_BUILD_UI=OFF
-  -DLSFGVK_BUILD_CLI=OFF
+  -DLSFGVK_BUILD_CLI=ON
   -DLSFGVK_PORTABLE_ABI=OFF
   -DLSFGVK_STATIC_LIBSTDCXX=OFF
 )
@@ -87,6 +87,11 @@ cp -a "${STAGE_DIR}/usr/local/share/." "${PACKAGE_DIR}/share/" 2>/dev/null || tr
 
 if [[ ! -f "${LAYER_SO}" ]]; then
   echo "ERROR: expected layer library missing: ${LAYER_SO}" >&2
+  exit 1
+fi
+
+if [[ ! -f "${PACKAGE_DIR}/bin/lsfg-vk-cli" ]]; then
+  echo "ERROR: expected CLI binary missing in package output" >&2
   exit 1
 fi
 

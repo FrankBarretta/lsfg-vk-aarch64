@@ -12,8 +12,6 @@
 #include <string>
 
 #include <getopt.h> // NOLINT (IWYU)
-#include <bits/getopt_core.h>
-#include <bits/getopt_ext.h>
 
 using namespace lsfgvk::cli;
 
